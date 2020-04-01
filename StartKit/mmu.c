@@ -43,9 +43,10 @@ int readBinaryFile(int p_num)
 
     if(bin_file_ptr)
     {
-        fseek(bin_file_ptr,p_num*256,SEEK_SET);
-        fgets(page, 256, bin_file_ptr);
-        result = _strtoi64(page,dump,10);
+        fseek(bin_file_ptr,p_num,SEEK_SET);
+        result = fread(page,8,1,bin_file_ptr);
+//        printf("\n%d",result);
+//        result = _strtoi64(page,dump,10);
 //        result /= 32;
     }
 
