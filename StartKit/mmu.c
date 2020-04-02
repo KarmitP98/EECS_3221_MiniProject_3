@@ -3,15 +3,15 @@
 
 FILE *add_file_ptr, *bin_file_ptr;
 int i = 0;
-int log_add[1000], page_num[1000], offset[1000], frame[10000], itemp[10000],page_m[1000], phy_add[1000];
-int page[256];
+int log_add[1000], page_num[1000], offset[1000], frame[1000], itemp[1000], page_m[1000], phy_add[1000];
 char temp[100];
 char *dump;
 
-int readBinaryFile(int);
+char *readBinaryFile(int);
+void outputBinaryFile();
 
 int main() {
-    add_file_ptr = fopen("D:\\EECS_3221\\EECS3221_MiniProject3-master\\StartKit\\addresses.txt", "r");
+    add_file_ptr = fopen("../StartKit/addresses.txt", "r");
 
     if (add_file_ptr) {
         while (fgets(temp, 1000, add_file_ptr) != NULL) {
@@ -20,14 +20,19 @@ int main() {
             page_num[i] /= 255;                 // Get the page number
             offset[i] &= 255;                   // Get the offset
             page_num[i] &= 15;
+            page_m[i] &= 65280;
+            page_m[i] >>= 8;
 
-            frame[i] = readBinaryFile(page_m[i]);
-            frame[i] <<=8;
+//            readBinaryFile(page_m[i]);
 
-            phy_add[i] = frame[i] | offset[i];
+            outputBinaryFile();
+//            frame[i] = _strtoi64(readBinaryFile(page_m[i]), dump, 10);
+//            frame[i] <<=8;
 
-            printf("\n%d\t%d\t%d\t%d\t%d\t%d", i, log_add[i], page_num[i], offset[i], frame[i],phy_add[i]);
-            i++;
+//            phy_add[i] = frame[i] | offset[i];
+
+//            printf("\n%d\t%d\t%d\t%d", i, log_add[i], page_num[i], offset[i]);
+//            i++;
         }
 
         fclose(add_file_ptr);
@@ -36,22 +41,35 @@ int main() {
     return 0;
 }
 
-int readBinaryFile(int p_num)
-{
-    int result;
-    bin_file_ptr = fopen("D:\\EECS_3221\\EECS3221_MiniProject3-master\\StartKit\\BACKING_STORE.bin","rb");
+char *readBinaryFile(int p_num) {
+    bin_file_ptr = fopen("../StartKit/BACKING_STORE.bin", "rb");
 
-    if(bin_file_ptr)
-    {
-        fseek(bin_file_ptr,p_num,SEEK_SET);
-        result = fread(page,8,1,bin_file_ptr);
-//        printf("\n%d",result);
-//        result = _strtoi64(page,dump,10);
-//        result /= 32;
+    __int8 page = 0;
+
+    if (bin_file_ptr) {
+        fseek(bin_file_ptr, p_num, SEEK_SET);
+        fread(page, 8, 1, bin_file_ptr);
+        printf("\n%d", page);
     }
 
     fclose(bin_file_ptr);
 
-    return result;
+    return page;
 }
 
+void outputBinaryFile()
+{
+    bin_file_ptr = fopen("../StartKit/BACKING_STORE.bin", "rb");
+
+    signed __int8 page;
+    char s_page[256];
+    char c;
+
+    if(bin_file_ptr)
+    {
+        while(fread(s_page, 256, 1, bin_file_ptr) == 1)
+        {
+            printf("\n%s", s_page);
+        }
+    }
+}
