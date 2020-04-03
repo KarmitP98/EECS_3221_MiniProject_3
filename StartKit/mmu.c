@@ -13,6 +13,8 @@ void outputBinaryFile();
 int main() {
     add_file_ptr = fopen("../StartKit/addresses.txt", "r");
 
+    outputBinaryFile();
+
     if (add_file_ptr) {
         while (fgets(temp, 1000, add_file_ptr) != NULL) {
             page_num[i] = offset[i] = log_add[i] = itemp[i] = page_m[i] =
@@ -25,7 +27,6 @@ int main() {
 
 //            readBinaryFile(page_m[i]);
 
-            outputBinaryFile();
 //            frame[i] = _strtoi64(readBinaryFile(page_m[i]), dump, 10);
 //            frame[i] <<=8;
 
@@ -62,14 +63,15 @@ void outputBinaryFile()
     bin_file_ptr = fopen("../StartKit/BACKING_STORE.bin", "rb");
 
     signed __int8 page;
-    char s_page[256];
-    char c;
 
     if(bin_file_ptr)
     {
-        while(fread(s_page, 256, 1, bin_file_ptr) == 1)
+        for(i = 0;i<65536;i++)
         {
-            printf("\n%s", s_page);
+            fread(&page, sizeof(signed __int8),1,bin_file_ptr);
+            printf("\n%d\t%d",i,page);
         }
     }
+
+    fclose(bin_file_ptr);
 }
