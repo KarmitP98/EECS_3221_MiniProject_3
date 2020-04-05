@@ -1,77 +1,150 @@
 #include <stdio.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 
-FILE *add_file_ptr, *bin_file_ptr;
-int i = 0;
-int log_add[1000], page_num[1000], offset[1000], frame[1000], itemp[1000], page_m[1000], phy_add[1000];
-char temp[100];
-char *dump;
+#define TLB_SIZE 16
+#define PAGES 256
+#define PAGE_MASK 255
 
-char *readBinaryFile(int);
-void outputBinaryFile();
+#define PAGE_SIZE 256
+#define OFFSET_BITS 8
+#define OFFSET_MASK 255
 
-int main() {
-    add_file_ptr = fopen("../StartKit/addresses.txt", "r");
+#define MEMORY_SIZE PAGES * PAGE_SIZE
 
-    outputBinaryFile();
+// Max number of characters per line of input file to read.
+#define BUFFER_SIZE 10
 
-    if (add_file_ptr) {
-        while (fgets(temp, 1000, add_file_ptr) != NULL) {
-            page_num[i] = offset[i] = log_add[i] = itemp[i] = page_m[i] =
-                    _strtoi64(temp, dump, 10);
-            page_num[i] /= 255;                 // Get the page number
-            offset[i] &= 255;                   // Get the offset
-            page_num[i] &= 15;
-            page_m[i] &= 65280;
-            page_m[i] >>= 8;
+struct tlbentry {
+    unsigned char logical;
+    unsigned char physical;
+};
 
-//            readBinaryFile(page_m[i]);
+// TLB is kept track of as a circular array, with the oldest element being overwritten once the TLB is full.
+struct tlbentry tlb[TLB_SIZE];
+// number of inserts into TLB that have been completed. Use as tlbindex % TLB_SIZE for the index of the next TLB line to use.
+int tlbindex = 0;
 
-//            frame[i] = _strtoi64(readBinaryFile(page_m[i]), dump, 10);
-//            frame[i] <<=8;
+// pagetable[logical_page] is the physical page number for logical page. Value is -1 if that logical page isn't yet in the table.
+int pagetable[PAGES];
 
-//            phy_add[i] = frame[i] | offset[i];
+signed char main_memory[MEMORY_SIZE];
 
-//            printf("\n%d\t%d\t%d\t%d", i, log_add[i], page_num[i], offset[i]);
-//            i++;
+// Pointer to memory mapped backing file
+signed char *backing;
+
+int maximum (int a, int b)
+{
+    if (a > b)
+        return
+                a;
+    return
+            b;
+}
+
+/* Returns the physical address from TLB or -1 if not present. */
+int search_tlb(unsigned char logical_page) {
+    int i;
+    for (i = maximum((tlbindex - TLB_SIZE), 0); i < tlbindex; i++) {
+        struct tlbentry *entry = &tlb[i % TLB_SIZE];
+
+        if (entry->logical == logical_page) {
+            return entry->physical;
+        }
+    }
+    return -1;
+}
+
+/* Adds the specified mapping to the TLB, replacing the oldest mapping (FIFO replacement). */
+void add_to_tlb(unsigned char logical, unsigned char physical) {
+    struct tlbentry *entry = &tlb[tlbindex % TLB_SIZE];
+
+    tlbindex++;
+    entry->logical = logical;
+    entry->physical = physical;
+}
+
+int main(int argc, const char *argv[]) {
+
+    char *csv_filename = "../StartKit/output.csv";
+    FILE *csv_ptr = fopen(csv_filename,"+w");
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage ./virtmem backingstore input\n");
+        exit(1);
+    }
+
+    const char *backing_filename = argv[1];
+    int backing_fd = open(backing_filename, O_RDONLY);
+    backing = mmap(0, MEMORY_SIZE, PROT_READ, MAP_PRIVATE, backing_fd, 0);
+
+    const char *input_filename = argv[2];
+    FILE *input_fp = fopen(input_filename, "r");
+
+// Fill page table entries with -1 for initially empty table.
+    int i;
+    for (i = 0; i < PAGES; i++) {
+        pagetable[i] = -1;
+    }
+
+// Character buffer for reading lines of input file.
+    char buffer[BUFFER_SIZE];
+
+// Data we need to keep track of to compute stats at end.
+    int total_addresses = 0;
+    int tlb_hits = 0;
+    int page_faults = 0;
+
+// Number of the next unallocated physical page in main memory
+    unsigned char free_page = 0;
+
+//Now, read virtual addess one by one, find its page number and offset
+//Then, check with TLB, if it is a miss, check with page table. If page table entry is -1, it is a page fault, then copy page from backing file into physical memory
+//Note you need to update page table and tlb correspondingly.
+    while (fgets(buffer, BUFFER_SIZE, input_fp) != NULL) {
+
+        total_addresses++;
+        int logical_address = atoi(buffer);
+        int offset = logical_address & OFFSET_MASK;
+        int logical_page = (logical_address >> OFFSET_BITS) & PAGE_MASK;
+        int physical_page = search_tlb(logical_page);
+//TLB hit
+
+        if (physical_page != -1) {
+            tlb_hits++;
+//TLB miss
+        } else {
+            physical_page = pagetable[logical_page];
+// Page fault
+            if (physical_page == -1) {
+                page_faults++;
+                physical_page = free_page;
+                free_page++;
+
+// Copy page from backing file into physical memory
+                memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
+
+                pagetable[logical_page] = physical_page;
+            }
+            add_to_tlb(logical_page, physical_page);
         }
 
-        fclose(add_file_ptr);
+        int physical_address = (physical_page << OFFSET_BITS) | offset;
+        signed char value = main_memory[physical_page * PAGE_SIZE + offset];
+        fprintf(csv_ptr,"%d, %d, %d\n",logical_address, physical_address, value);
+        printf("Virtual addess: %d Physical addess: %d Value:%d\n", logical_address, physical_address, value);
     }
+
+    fclose(csv_ptr);
+    printf("Number of Translated Addresses = %d\n", total_addresses);
+    printf("Page Faults = %d\n", page_faults);
+    printf("Page Fault Rate = %.3f\n", page_faults / (1. * total_addresses));
+    printf("TLB Hits = %d\n", tlb_hits);
+    printf("TLB Hit Rate = %.3f\n", tlb_hits / (1. * total_addresses));
 
     return 0;
-}
-
-char *readBinaryFile(int p_num) {
-    bin_file_ptr = fopen("../StartKit/BACKING_STORE.bin", "rb");
-
-    __int8 page = 0;
-
-    if (bin_file_ptr) {
-        fseek(bin_file_ptr, p_num, SEEK_SET);
-        fread(page, 8, 1, bin_file_ptr);
-        printf("\n%d", page);
-    }
-
-    fclose(bin_file_ptr);
-
-    return page;
-}
-
-void outputBinaryFile()
-{
-    bin_file_ptr = fopen("../StartKit/BACKING_STORE.bin", "rb");
-
-    signed __int8 page;
-
-    if(bin_file_ptr)
-    {
-        for(i = 0;i<65536;i++)
-        {
-            fread(&page, sizeof(signed __int8),1,bin_file_ptr);
-            printf("\n%d\t%d",i,page);
-        }
-    }
-
-    fclose(bin_file_ptr);
 }
