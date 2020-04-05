@@ -14,4 +14,4 @@ add_executable(EECS3221_MiniProject3_master
         StartKit/BACKING_STORE.bin
         StartKit/correct.txt
         StartKit/test.sh
-        README.md StartKit/mmu.c)
+        README.md StartKit/mmu.c StartKit/test.c)
