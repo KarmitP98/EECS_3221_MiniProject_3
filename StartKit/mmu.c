@@ -92,6 +92,10 @@ int main(int argc, const char *argv[]) {
         fprintf(csv_ptr, "%d, %d, %d\n", logical_address, physical_address, value);
         printf("%d\n", value);
     }
+    fprintf(csv_ptr,"Page Faults = %d\nTLB Hits = %d\n", page_faults, ++tlb_hits);
+    fprintf(csv_ptr,"Page Fault Rate = %.2f\nTLB Hit Rate = %.2f\n", page_faults / (1.00 * total_addresses),
+            tlb_hits / (1.00 * total_addresses));
+
 
     fclose(csv_ptr);
     printf("Page Faults = %d\nTLB Hits = %d\n", page_faults, ++tlb_hits);
