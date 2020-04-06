@@ -1,3 +1,7 @@
+/*
+ * Create by Karmit
+ * 17 March, 2020
+ */
 #include <stdio.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -44,7 +48,8 @@ int main(int argc, const char *argv[]) {
     csv_ptr = fopen(csv_filename, "w+");
 
     const char *backing_filename = argv[1];
-    int backing_fd = open(backing_filename, O_RDONLY);
+    int backing_fd = open(backing_filename, 0);
+    // Map a specific memory size.
     backing = mmap(0, MEMORY_SIZE, PROT_READ, MAP_PRIVATE, backing_fd, 0);
 
     const char *input_filename = argv[2];
@@ -64,12 +69,12 @@ int main(int argc, const char *argv[]) {
     unsigned char free_page = 0;
 
     while (fgets(buffer, BUFFER_SIZE, input_fp) != NULL) {
-
-        total_addresses++;
         int logical_address = atoi(buffer);
         int offset = logical_address & OFFSET_MASK;
         int logical_page = (logical_address >> OFFSET_BITS) & PAGE_MASK;
         int physical_page = search_tlb(logical_page);
+
+        total_addresses++;
 
         if (physical_page != -1) {
             tlb_hits++;
