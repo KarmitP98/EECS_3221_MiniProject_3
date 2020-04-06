@@ -13,21 +13,13 @@
 #define TLB_ENTRIES 16
 #define PAGES 256
 #define PAGE_MASK 255
-
 #define PAGE_SIZE 256
 #define OFFSET_BITS 8
 #define OFFSET_MASK 255
-
 #define MEMORY_SIZE PAGES * PAGE_SIZE
-
 #define BUFFER_SIZE 10
 
-struct tlbentry {
-    unsigned char logical;
-    unsigned char physical;
-};
-
-struct tlbentry tlb[TLB_ENTRIES];
+unsigned char logical[TLB_ENTRIES], physical[TLB_ENTRIES];
 
 int current_ind = 0;
 
@@ -38,7 +30,9 @@ signed char main_memory[MEMORY_SIZE];
 signed char *backing;
 
 int maximum(int, int);
+
 int search_tlb(unsigned char);
+
 void add_tlb_entry(unsigned char, unsigned char);
 
 int main(int argc, const char *argv[]) {
@@ -115,21 +109,18 @@ int maximum(int a, int b) {
 }
 
 int search_tlb(unsigned char logical_page) {
-    int i;
-    for (i = maximum((current_ind - TLB_ENTRIES), 0); i < current_ind; i++) {
-        struct tlbentry *entry = &tlb[i % TLB_ENTRIES];
+    int temp;
+    for (temp = maximum((current_ind - TLB_ENTRIES), 0); temp < current_ind; temp++) {
 
-        if (entry->logical == logical_page) {
-            return entry->physical;
-        }
+        if (logical[temp % TLB_ENTRIES] == logical_page)
+            return physical[temp % TLB_ENTRIES];
     }
     return -1;
 }
 
-void add_tlb_entry(unsigned char logical, unsigned char physical) {
-    struct tlbentry *entry = &tlb[current_ind % TLB_ENTRIES];
+void add_tlb_entry(unsigned char log, unsigned char phy) {
 
+    logical[current_ind % TLB_ENTRIES] = log;
+    physical[current_ind % TLB_ENTRIES] = phy;
     current_ind++;
-    entry->logical = logical;
-    entry->physical = physical;
 }
